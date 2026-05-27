@@ -1,0 +1,12 @@
+{
+  "name": "claude-session-browser",
+  "version": "1.0.0",
+  "description": "Visor de sesiones de Claude Code",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^34.0.0"
+  }
+}

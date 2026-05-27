@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Claude Sessions</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:         #0e0e10;
+    --surface:    #18181b;
+    --surface2:   #232327;
+    --border:     #2e2e33;
+    --accent:     #d4882e;
+    --violet:     #7c3aed;
+    --text:       #f4f4f5;
+    --muted:      #71717a;
+    --success:    #22c55e;
+    --radius:     10px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+    -webkit-app-region: no-drag;
+    user-select: none;
+  }
+
+  /* ── Header ── */
+  header {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(14,14,16,.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 20px;
+    display: flex; align-items: center; gap: 12px;
+    -webkit-app-region: drag;
+  }
+  header * { -webkit-app-region: no-drag; }
+
+  .logo { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .logo svg { width: 24px; height: 24px; }
+  .logo span { font-size: 15px; font-weight: 600; letter-spacing: -.3px; }
+
+  .search-wrap { flex: 1; position: relative; max-width: 400px; }
+  .search-wrap input {
+    width: 100%;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; color: var(--text);
+    padding: 7px 12px 7px 32px; font-size: 13px; outline: none;
+    transition: border-color .15s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-wrap svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+
+  .header-right { display: flex; align-items: center; gap: 10px; margin-left: auto; flex-shrink: 0; }
+  .count { color: var(--muted); font-size: 12px; white-space: nowrap; }
+
+  .icon-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 7px; color: var(--muted); cursor: pointer;
+    padding: 6px 8px; display: flex; align-items: center;
+    transition: background .15s, color .15s;
+  }
+  .icon-btn:hover { background: var(--border); color: var(--text); }
+  .icon-btn.spin svg { animation: spin .6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Main ── */
+  main { padding: 20px; }
+
+  .state-msg { text-align: center; padding: 80px 20px; color: var(--muted); }
+  .state-msg h2 { font-size: 18px; margin-bottom: 8px; color: var(--text); }
+
+  /* ── Grid ── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 12px;
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px;
+    display: flex; flex-direction: column; gap: 9px;
+    transition: border-color .15s, transform .1s;
+  }
+  .card:hover { border-color: #444; transform: translateY(-1px); }
+
+  .card-header { display: flex; align-items: flex-start; gap: 8px; }
+  .card-icon { flex-shrink: 0; margin-top: 1px; color: var(--accent); }
+  .card-title {
+    font-size: 13px; font-weight: 600; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+  }
+
+  .card-path {
+    font-size: 11px; color: var(--muted); font-family: monospace;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    padding: 3px 8px; background: var(--surface2);
+    border-radius: 5px; border: 1px solid var(--border);
+  }
+
+  .card-message {
+    font-size: 12px; color: #a1a1aa; line-height: 1.5;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    min-height: 38px;
+  }
+  .card-message.empty { font-style: italic; color: var(--muted); }
+
+  .card-meta { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); }
+  .meta-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--border); }
+
+  .card-actions { display: flex; gap: 7px; margin-top: 2px; }
+
+  .btn {
+    flex: 1; border: none; border-radius: 7px; cursor: pointer;
+    font-size: 12px; font-weight: 500; padding: 7px 10px;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
+    transition: opacity .15s, filter .15s;
+  }
+  .btn:hover   { opacity: .85; }
+  .btn:active  { filter: brightness(.82); }
+  .btn-resume  { background: var(--violet); color: #fff; }
+  .btn-open    { background: var(--surface2); color: var(--text); border: 1px solid var(--border); flex: 0 0 auto; }
+  .btn-copy    { background: transparent; color: var(--muted); border: 1px solid var(--border); flex: 0 0 auto; padding: 7px; }
+  .btn-copy.copied { color: var(--success); border-color: var(--success); }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 20px; right: 20px; z-index: 100;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 14px; font-size: 13px; color: var(--text);
+    box-shadow: 0 4px 20px rgba(0,0,0,.4);
+    opacity: 0; transform: translateY(6px);
+    transition: opacity .2s, transform .2s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" fill="#d4882e" opacity=".2"/>
+      <path d="M9 12l2 2 4-4" stroke="#d4882e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span>Claude Sessions</span>
+  </div>
+
+  <div class="search-wrap">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+    </svg>
+    <input id="search" type="text" placeholder="Buscar por directorio o mensaje..." autocomplete="off">
+  </div>
+
+  <div class="header-right">
+    <span class="count" id="count"></span>
+    <button class="icon-btn" id="refresh-btn" title="Actualizar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <div id="state" class="state-msg" style="display:none">
+    <h2 id="state-title"></h2>
+    <p  id="state-body"></p>
+  </div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+  let displayedSessions = [];
+
+  function relativeTime(iso) {
+    if (!iso) return 'fecha desconocida';
+    const s = Math.floor((Date.now() - new Date(iso)) / 1000);
+    if (s < 60)  return 'hace un momento';
+    const m = Math.floor(s / 60);
+    if (m < 60)  return `hace ${m} min`;
+    const h = Math.floor(m / 60);
+    if (h < 24)  return `hace ${h}h`;
+    const d = Math.floor(h / 24);
+    if (d < 30)  return `hace ${d}d`;
+    return new Date(iso).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+
+  function projectName(cwd) {
+    if (!cwd) return 'Sin directorio';
+    return cwd.replace(/\\/g, '/').split('/').filter(Boolean).slice(-2).join('/') || cwd;
+  }
+
+  function esc(s) {
+    return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function renderCard(s, idx) {
+    const time = relativeTime(s.lastTimestamp);
+    const msgs = s.messageCount === 1 ? '1 mensaje' : `${s.messageCount} mensajes`;
+    const msgClass = s.firstMessage ? 'card-message' : 'card-message empty';
+    const msgText  = s.firstMessage ? esc(s.firstMessage) : 'Sin mensajes';
+
+    return `
+    <div class="card">
+      <div class="card-header">
+        <svg class="card-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+        </svg>
+        <span class="card-title" title="${esc(s.cwd)}">${esc(projectName(s.cwd))}</span>
+      </div>
+      <div class="card-path" title="${esc(s.cwd)}">${esc(s.cwd)}</div>
+      <div class="${msgClass}">${msgText}</div>
+      <div class="card-meta">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+        </svg>
+        ${time}<span class="meta-dot"></span>${msgs}
+      </div>
+      <div class="card-actions">
+        <button class="btn btn-resume" onclick="launch(${idx},'resume')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          Recuperar sesión
+        </button>
+        <button class="btn btn-open" onclick="launch(${idx},'open')" title="Abrir directorio en terminal">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+          </svg>
+          Terminal
+        </button>
+        <button class="btn btn-copy" onclick="copyId(${idx},this)" title="Copiar ID de sesión">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+        </button>
+      </div>
+    </div>`;
+  }
+
+  function renderGrid(sessions) {
+    const grid  = document.getElementById('grid');
+    const state = document.getElementById('state');
+    displayedSessions = sessions;
+
+    if (sessions.length === 0) {
+      grid.innerHTML = '';
+      state.style.display = '';
+      document.getElementById('state-title').textContent = 'Sin resultados';
+      document.getElementById('state-body').textContent  = 'No se encontraron sesiones que coincidan.';
+    } else {
+      state.style.display = 'none';
+      grid.innerHTML = sessions.map((s, i) => renderCard(s, i)).join('');
+    }
+    document.getElementById('count').textContent = `${sessions.length} sesión${sessions.length !== 1 ? 'es' : ''}`;
+  }
+
+  function filterSessions(q) {
+    if (!q) return window._allSessions;
+    const lq = q.toLowerCase();
+    return window._allSessions.filter(s =>
+      (s.cwd         || '').toLowerCase().includes(lq) ||
+      (s.firstMessage|| '').toLowerCase().includes(lq) ||
+      (s.sessionId   || '').toLowerCase().includes(lq)
+    );
+  }
+
+  async function loadSessions() {
+    const btn = document.getElementById('refresh-btn');
+    btn.classList.add('spin');
+    try {
+      window._allSessions = await window.claude.getSessions();
+      renderGrid(filterSessions(document.getElementById('search').value));
+    } catch (e) {
+      document.getElementById('state').style.display = '';
+      document.getElementById('state-title').textContent = 'Error al cargar sesiones';
+      document.getElementById('state-body').textContent  = e.message;
+    } finally {
+      btn.classList.remove('spin');
+    }
+  }
+
+  async function launch(idx, mode) {
+    const s = displayedSessions[idx];
+    if (!s) return;
+    const result = await window.claude.launch({ sessionId: s.sessionId, cwd: s.cwd, mode });
+    if (result.ok) {
+      showToast(mode === 'resume' ? '▶ Abriendo sesión...' : '📂 Abriendo directorio...');
+    } else {
+      showToast('Error: ' + (result.error || 'desconocido'));
+    }
+  }
+
+  function copyId(idx, btn) {
+    const s = displayedSessions[idx];
+    if (!s) return;
+    navigator.clipboard.writeText(s.sessionId).then(() => {
+      btn.classList.add('copied');
+      showToast('ID copiado al portapapeles');
+      setTimeout(() => btn.classList.remove('copied'), 2000);
+    });
+  }
+
+  let toastTimer;
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+  }
+
+  document.getElementById('search').addEventListener('input', e => {
+    renderGrid(filterSessions(e.target.value));
+  });
+  document.getElementById('refresh-btn').addEventListener('click', loadSessions);
+
+  window._allSessions = [];
+  loadSessions();
+</script>
+</body>
+</html>
